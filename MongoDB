@@ -1,0 +1,91 @@
+from flask import Flask, jsonify, request, render_template
+from pymongo import MongoClient
+from bson import ObjectId
+
+
+app = Flask(__name__)
+
+# --- Kết nối tới MongoDB Cloud (Atlas) ---
+client = MongoClient("mongodb+srv://BaoDBUser:BaoBaoBao@cluster0.yy17x7j.mongodb.net/?appName=Cluster0")
+db = client["cloud_homework"]
+collection = db["users"]
+
+# --- Hàm chuyển ObjectId sang chuỗi ---
+def to_json(data):
+    if isinstance(data, list):
+        for item in data:
+            item["_id"] = str(item["_id"])
+    else:
+        data["_id"] = str(data["_id"])
+    return data
+
+# --- API: Thêm người dùng ---
+@app.route("/add", methods=["POST"])
+def add_user():
+    data = request.json
+    if not data.get("name") or not data.get("age"):
+        return jsonify({"status": "error", "message": "Thiếu tên hoặc tuổi!"}), 400
+    
+    result = collection.insert_one({
+        "name": data["name"],
+        "age": data["age"]
+    })
+    return jsonify({
+        "status": "success",
+        "message": "Thêm thành công!",
+        "inserted_id": str(result.inserted_id)
+    }), 201
+
+# --- API: Xem toàn bộ người dùng ---
+@app.route("/list", methods=["GET"])
+def list_users():
+    users = list(collection.find())
+    users = to_json(users)
+    return jsonify({"status": "success", "data": users}), 200
+
+# --- API: Xem chi tiết theo tên ---
+@app.route("/find/<name>", methods=["GET"])
+def find_user(name):
+    user = collection.find_one({"name": name})
+    if not user:
+        return jsonify({"status": "error", "message": "Không tìm thấy người dùng"}), 404
+    return jsonify({"status": "success", "data": to_json(user)}), 200
+
+# --- API: Cập nhật thông tin người dùng ---
+@app.route("/update/<id>", methods=["PUT"])
+def update_user(id):
+    data = request.json
+    update_data = {}
+    if "name" in data:
+        update_data["name"] = data["name"]
+    if "age" in data:
+        update_data["age"] = data["age"]
+
+    if not update_data:
+        return jsonify({"status": "error", "message": "Không có dữ liệu để cập nhật"}), 400
+
+    result = collection.update_one({"_id": ObjectId(id)}, {"$set": update_data})
+    if result.matched_count == 0:
+        return jsonify({"status": "error", "message": "Không tìm thấy người dùng với ID này"}), 404
+
+    return jsonify({"status": "success", "message": "Cập nhật thành công!"}), 200
+
+# --- API: Xóa người dùng theo ID ---
+@app.route("/delete/<id>", methods=["DELETE"])
+def delete_user(id):
+    result = collection.delete_one({"_id": ObjectId(id)})
+    if result.deleted_count == 0:
+        return jsonify({"status": "error", "message": "Không tìm thấy người dùng để xóa"}), 404
+    return jsonify({"status": "success", "message": "Xóa thành công!"}), 200
+
+# --- API kiểm tra kết nối ---
+@app.route("/", methods=["GET"])
+def home():
+    return jsonify({"message": "Connected successfully !"})
+
+@app.route("/web")
+def web_ui():
+    return render_template("index.html")
+
+if __name__ == "__main__":
+    app.run(debug=True)

@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Quản lý người dùng</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+  </head>
+  <body class="bg-light">
+    <div class="container mt-4">
+      <h2 class="text-center mb-4">👤 Quản lý người dùng MongoDB</h2>
+
+      <!-- Form thêm người dùng -->
+      <div class="card p-3 mb-4">
+        <h5>Thêm người dùng</h5>
+        <input
+          type="text"
+          id="name"
+          class="form-control mb-2"
+          placeholder="Tên"
+        />
+        <input
+          type="number"
+          id="age"
+          class="form-control mb-2"
+          placeholder="Tuổi"
+        />
+        <input
+          type="text"
+          id="countrySide"
+          class="form-control mb-2"
+          placeholder="Quê quán (có thể bỏ trống)"
+        />
+        <button class="btn btn-success" onclick="addUser()">Thêm</button>
+      </div>
+
+      <!-- Danh sách người dùng -->
+      <div class="card p-3">
+        <h5>Danh sách người dùng</h5>
+        <table class="table table-striped">
+          <thead>
+            <tr>
+              <th>Tên</th>
+              <th>Tuổi</th>
+              <th>Quê quán</th>
+              <th>Hành động</th>
+            </tr>
+          </thead>
+          <tbody id="userTable"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <script>
+      const API = "http://127.0.0.1:5000";
+
+      // --- Lấy danh sách người dùng ---
+      async function loadUsers() {
+        try {
+          const res = await fetch(`${API}/list`);
+          const data = await res.json();
+          const table = document.getElementById("userTable");
+          table.innerHTML = "";
+          if (data.status === "success" && data.data.length > 0) {
+            data.data.forEach((user) => {
+              table.innerHTML += `
+              <tr>
+                <td>${user.name}</td>
+                <td>${user.age}</td>
+                <td>${user.countrySide || ""}</td>
+                <td>
+                  <button class="btn btn-warning btn-sm" onclick="updateUser('${user._id}')">Sửa</button>
+                  <button class="btn btn-danger btn-sm" onclick="deleteUser('${user._id}')">Xóa</button>
+                </td>
+              </tr>`;
+            });
+          } else {
+            table.innerHTML = `<tr><td colspan="4" class="text-center">Chưa có người dùng nào</td></tr>`;
+          }
+        } catch (error) {
+          alert("Lỗi khi tải danh sách người dùng: " + error.message);
+        }
+      }
+
+      // --- Thêm người dùng ---
+      async function addUser() {
+        const name = document.getElementById("name").value.trim();
+        const age = document.getElementById("age").value.trim();
+        const countrySide = document.getElementById("countrySide").value.trim();
+
+        if (!name || !age) {
+          return alert("Vui lòng nhập đầy đủ tên và tuổi!");
+        }
+
+        try {
+          const res = await fetch(`${API}/add`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name, age, countrySide }),
+          });
+
+          const data = await res.json();
+
+          if (!res.ok) {
+            // Nếu API trả lỗi (status code 4xx, 5xx)
+            return alert(data.message || "Lỗi khi thêm người dùng!");
+          }
+
+          if (data.alert) {
+            alert(data.alert); // Hiển thị cảnh báo nếu có
+          }
+
+          // Reset form
+          document.getElementById("name").value = "";
+          document.getElementById("age").value = "";
+          document.getElementById("countrySide").value = "";
+
+          loadUsers();
+        } catch (error) {
+          alert("Lỗi khi gửi dữ liệu: " + error.message);
+        }
+      }
+
+      // --- Cập nhật người dùng ---
+      async function updateUser(id) {
+        try {
+          const newName = prompt("Nhập tên mới:");
+          if (newName === null) return; // nếu bấm cancel
+
+          const newAge = prompt("Nhập tuổi mới:");
+          if (newAge === null) return;
+
+          const newCountrySide = prompt("Nhập quê quán mới (có thể bỏ trống):");
+          if (newCountrySide === null) return;
+
+          // Chuẩn bị body gửi lên, bỏ những trường rỗng (null/empty string)
+          const updateData = {};
+          if (newName.trim() !== "") updateData.name = newName.trim();
+          if (newAge.trim() !== "") {
+            if (isNaN(parseInt(newAge))) {
+              return alert("Tuổi phải là số nguyên hợp lệ!");
+            }
+            updateData.age = parseInt(newAge);
+          }
+          // Quê quán có thể bỏ trống nên vẫn gửi
+          updateData.countrySide = newCountrySide.trim();
+
+          if (Object.keys(updateData).length === 0) {
+            return alert("Bạn chưa nhập thông tin để cập nhật!");
+          }
+
+          const res = await fetch(`${API}/update/${id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(updateData),
+          });
+
+          const data = await res.json();
+
+          if (!res.ok) {
+            return alert(data.message || "Lỗi khi cập nhật người dùng!");
+          }
+
+          alert(data.message || "Cập nhật thành công!");
+          loadUsers();
+        } catch (error) {
+          alert("Lỗi khi cập nhật người dùng: " + error.message);
+        }
+      }
+
+      // --- Xóa người dùng ---
+      async function deleteUser(id) {
+        if (!confirm("Bạn có chắc muốn xóa người dùng này?")) return;
+        try {
+          const res = await fetch(`${API}/delete/${id}`, { method: "DELETE" });
+          const data = await res.json();
+          if (!res.ok) {
+            return alert(data.message || "Lỗi khi xóa người dùng!");
+          }
+          alert(data.message || "Xóa thành công!");
+          loadUsers();
+        } catch (error) {
+          alert("Lỗi khi xóa người dùng: " + error.message);
+        }
+      }
+
+      // --- Tải danh sách khi mở trang ---
+      loadUsers();
+    </script>
+  </body>
+</html>

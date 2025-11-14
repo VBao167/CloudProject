@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Quản lý người dùng</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+  </head>
+  <body class="bg-light">
+    <div class="container mt-4">
+      <h2 class="text-center mb-4">👤 Quản lý người dùng MongoDB</h2>
+
+      <!-- Form thêm người dùng -->
+      <div class="card p-3 mb-4">
+        <h5>Thêm người dùng</h5>
+        <input
+          type="text"
+          id="name"
+          class="form-control mb-2"
+          placeholder="Tên"
+        />
+        <input
+          type="number"
+          id="age"
+          class="form-control mb-2"
+          placeholder="Tuổi"
+        />
+        <button class="btn btn-success" onclick="addUser()">Thêm</button>
+      </div>
+
+      <!-- Danh sách người dùng -->
+      <div class="card p-3">
+        <h5>Danh sách người dùng</h5>
+        <table class="table table-striped">
+          <thead>
+            <tr>
+              <th>Tên</th>
+              <th>Tuổi</th>
+              <th>Hành động</th>
+            </tr>
+          </thead>
+          <tbody id="userTable"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <script>
+      const API = "http://127.0.0.1:5000";
+
+      // --- Lấy danh sách người dùng ---
+      async function loadUsers() {
+        const res = await fetch(`${API}/list`);
+        const data = await res.json();
+        const table = document.getElementById("userTable");
+        table.innerHTML = "";
+        data.data.forEach((user) => {
+          table.innerHTML += `
+          <tr>
+            <td>${user.name}</td>
+            <td>${user.age}</td>
+            <td>
+              <button class="btn btn-warning btn-sm" onclick="updateUser('${user._id}')">Sửa</button>
+              <button class="btn btn-danger btn-sm" onclick="deleteUser('${user._id}')">Xóa</button>
+            </td>
+          </tr>`;
+        });
+      }
+
+      // --- Thêm người dùng ---
+      async function addUser() {
+        const name = document.getElementById("name").value;
+        const age = document.getElementById("age").value;
+
+        if (!name || !age) return alert("Vui lòng nhập đầy đủ thông tin!");
+
+        await fetch(`${API}/add`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, age }),
+        });
+
+        document.getElementById("name").value = "";
+        document.getElementById("age").value = "";
+        loadUsers();
+      }
+
+      // --- Cập nhật người dùng ---
+      async function updateUser(id) {
+        const newName = prompt("Nhập tên mới:");
+        const newAge = prompt("Nhập tuổi mới:");
+        if (!newName && !newAge) return;
+
+        await fetch(`${API}/update/${id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: newName, age: parseInt(newAge) }),
+        });
+
+        loadUsers();
+      }
+
+      // --- Xóa người dùng ---
+      async function deleteUser(id) {
+        if (!confirm("Bạn có chắc muốn xóa người dùng này?")) return;
+        await fetch(`${API}/delete/${id}`, { method: "DELETE" });
+        loadUsers();
+      }
+
+      // --- Tải danh sách khi mở trang ---
+      loadUsers();
+    </script>
+  </body>
+</html>
